@@ -61,4 +61,5 @@ async fn get_containers() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let body = serde_json::from_slice::<Vec<String>>(&body[..]).unwrap();
 
+    assert_eq!(body, vec!["test1", "test2", "test3"]);
 }
