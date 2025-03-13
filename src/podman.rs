@@ -16,6 +16,7 @@ pub trait PodmanServiceTrait: Send + Sync {
     fn running_containers(&self) -> Vec<PodmanContainer>;
 }
 
+#[derive(Default)]
 pub struct PodmanService;
 
 impl PodmanService {
