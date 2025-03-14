@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::{Json, Router, extract::State, routing::get};
 use podman::PodmanServiceTrait;
+use serde::Serialize;
 use tower_http::trace::{self, TraceLayer};
 use tracing::Level;
 
@@ -18,13 +19,22 @@ pub fn app<PODMAN: PodmanServiceTrait + 'static>(podman_service: Arc<PODMAN>) ->
         )
 }
 
+#[derive(Serialize)]
+pub struct Container {
+    name: String,
+    started_at: u64,
+}
+
 async fn get_containers<PODMAN: PodmanServiceTrait>(
     State(podman): State<Arc<PODMAN>>,
-) -> Json<Vec<String>> {
+) -> Json<Vec<Container>> {
     let containers = podman.running_containers();
     let containers = containers
         .iter()
-        .map(|container| container.names.first().unwrap().to_string())
+        .map(|container| Container {
+            name: container.names.first().unwrap().to_string(),
+            started_at: container.started_at,
+        })
         .collect();
     Json(containers)
 }
