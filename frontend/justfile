@@ -1,0 +1,7 @@
+alias i := install
+
+dev *FLAGS:
+    bun dev {{FLAGS}}
+
+install:
+    bun install
