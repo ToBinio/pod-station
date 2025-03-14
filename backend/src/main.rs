@@ -9,7 +9,7 @@ async fn main() {
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
         .await
         .unwrap();
 
