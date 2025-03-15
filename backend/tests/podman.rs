@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use axum::routing::connect;
-use axum_test::{TestServer, TestWebSocket};
+use axum_test::TestServer;
 use pod_station::{
     app,
     podman::{ContainerInfo, ContainerStats, PodmanServiceTrait},
