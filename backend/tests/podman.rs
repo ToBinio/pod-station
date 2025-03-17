@@ -78,17 +78,26 @@ async fn get_containers() {
         {
             "id": "123",
             "name": "test1",
-            "started_at": 894
+            "started_at": 894,
+            "cpu_percent": 0.2,
+            "memory_percent": 0.1,
+            "memory_usage": "114.7kB / 33.44GB"
         },
         {
             "id": "456",
             "name": "test2",
-            "started_at": 89583
+            "started_at": 89583,
+            "cpu_percent": 0.5,
+            "memory_percent": 0.8,
+            "memory_usage": "114.7kB / 33.44GB"
         },
         {
             "id": "789",
             "name": "test3",
-            "started_at": 123123
+            "started_at": 123123,
+            "cpu_percent": 0.23,
+            "memory_percent": 0.62,
+            "memory_usage": "114.7kB / 33.44GB"
         }
     ]));
 }
@@ -104,18 +113,24 @@ async fn ws() {
             .assert_receive_json(&json!([
                 {
                     "id": "123",
+                    "name": "test1",
+                    "started_at": 894,
                     "cpu_percent": 0.2,
                     "memory_percent": 0.1,
                     "memory_usage": "114.7kB / 33.44GB"
                 },
                 {
                     "id": "456",
+                    "name": "test2",
+                    "started_at": 89583,
                     "cpu_percent": 0.5,
                     "memory_percent": 0.8,
                     "memory_usage": "114.7kB / 33.44GB"
                 },
                 {
                     "id": "789",
+                    "name": "test3",
+                    "started_at": 123123,
                     "cpu_percent": 0.23,
                     "memory_percent": 0.62,
                     "memory_usage": "114.7kB / 33.44GB"

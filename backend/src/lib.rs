@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{iter::zip, sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
@@ -10,6 +10,7 @@ use axum::{
     routing::{any, get},
 };
 use futures::{sink::SinkExt, stream::StreamExt};
+use itertools::Itertools;
 use podman::PodmanServiceTrait;
 use serde::Serialize;
 use tower_http::trace::{self, TraceLayer};
@@ -19,7 +20,7 @@ pub mod podman;
 
 pub fn app<PODMAN: PodmanServiceTrait + 'static>(podman_service: Arc<PODMAN>) -> Router {
     Router::new()
-        .route("/containers", get(get_containers))
+        .route("/containers", get(get_all_containers))
         .route("/ws", any(ws_handler))
         .with_state(podman_service)
         .layer(
@@ -34,21 +35,48 @@ pub struct Container {
     id: String,
     name: String,
     started_at: u64,
+    cpu_percent: f32,
+    memory_percent: f32,
+    memory_usage: String,
 }
 
-async fn get_containers<PODMAN: PodmanServiceTrait>(
+pub fn get_container_stats<PODMAN: PodmanServiceTrait>(podman: Arc<PODMAN>) -> Vec<Container> {
+    let container_infos = podman.running_containers();
+
+    let container_stats = podman.running_containers_stats();
+
+    let containers = zip(
+        container_infos.iter().sorted_by(|a, b| a.id.cmp(&b.id)),
+        container_stats.iter().sorted_by(|a, b| a.id.cmp(&b.id)),
+    )
+    .map(|(info, stats)| {
+        assert_eq!(info.id, stats.id);
+        Container {
+            id: info.id.clone(),
+            name: info.names.first().unwrap().to_string(),
+            started_at: info.started_at,
+            cpu_percent: stats
+                .cpu_percent
+                .trim_end_matches('%')
+                .parse()
+                .unwrap_or(0.0),
+            memory_percent: stats
+                .mem_percent
+                .trim_end_matches('%')
+                .parse()
+                .unwrap_or(0.0),
+            memory_usage: stats.mem_usage.clone(),
+        }
+    })
+    .collect();
+
+    containers
+}
+
+async fn get_all_containers<PODMAN: PodmanServiceTrait>(
     State(podman): State<Arc<PODMAN>>,
 ) -> Json<Vec<Container>> {
-    let containers = podman.running_containers();
-    let containers = containers
-        .iter()
-        .map(|container| Container {
-            id: container.id.clone(),
-            name: container.names.first().unwrap().to_string(),
-            started_at: container.started_at,
-        })
-        .collect();
-
+    let containers = get_container_stats(podman);
     Json(containers)
 }
 
@@ -60,14 +88,6 @@ async fn ws_handler<PODMAN: PodmanServiceTrait + 'static>(
     ws.on_upgrade(move |socket| handle_socket(socket, podman))
 }
 
-#[derive(Serialize)]
-pub struct ContainerStats {
-    id: String,
-    cpu_percent: f32,
-    memory_percent: f32,
-    memory_usage: String,
-}
-
 async fn handle_socket<PODMAN: PodmanServiceTrait + 'static>(
     socket: WebSocket,
     podman: Arc<PODMAN>,
@@ -76,27 +96,8 @@ async fn handle_socket<PODMAN: PodmanServiceTrait + 'static>(
 
     let send_task = tokio::spawn(async move {
         loop {
-            let message = serde_json::to_string(
-                &podman
-                    .running_containers_stats()
-                    .iter()
-                    .map(|stats| ContainerStats {
-                        id: stats.id.clone(),
-                        cpu_percent: stats
-                            .cpu_percent
-                            .trim_end_matches('%')
-                            .parse()
-                            .unwrap_or(0.0),
-                        memory_percent: stats
-                            .mem_percent
-                            .trim_end_matches('%')
-                            .parse()
-                            .unwrap_or(0.0),
-                        memory_usage: stats.mem_usage.clone(),
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .unwrap();
+            let containers = get_container_stats(podman.clone());
+            let message = serde_json::to_string(&containers).unwrap();
 
             match sender.send(Message::Text(message.into())).await {
                 Ok(_) => {}
