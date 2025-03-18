@@ -1,4 +1,8 @@
 export interface Container {
-    name: string;
-    started_at: number;
+  id: string;
+  name: string;
+  started_at: number;
+  cpu_percent: number;
+  memory_percent: number;
+  memory_usage: string;
 }

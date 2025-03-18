@@ -50,7 +50,8 @@ pub fn get_container_stats<PODMAN: PodmanServiceTrait>(podman: Arc<PODMAN>) -> V
         container_stats.iter().sorted_by(|a, b| a.id.cmp(&b.id)),
     )
     .map(|(info, stats)| {
-        assert_eq!(info.id, stats.id);
+        // assert via starts with since stats sometimes have a shortened version
+        assert!(info.id.starts_with(&stats.id));
         Container {
             id: info.id.clone(),
             name: info.names.first().unwrap().to_string(),
