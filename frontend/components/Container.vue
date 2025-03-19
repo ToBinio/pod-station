@@ -43,7 +43,7 @@ watch(
 </script>
 
 <template>
-    <div class="bg-gray-200 p-2 rounded-md">
+    <div class="bg-stone-800 text-white p-2 rounded-md">
         <div class="flex flex-row justify-around">
             <div>name: {{ container.name }}</div>
             <div data-allow-mismatch>uptime: {{ uptime }}</div>
@@ -91,5 +91,3 @@ watch(
         </div>
     </div>
 </template>
-
-<style scoped></style>
