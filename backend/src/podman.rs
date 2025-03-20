@@ -37,7 +37,7 @@ impl PodmanService {
 impl PodmanServiceTrait for PodmanService {
     fn running_containers(&self) -> Vec<ContainerInfo> {
         let output = Command::new("podman")
-            .args(["ps", "--format", "json"])
+            .args(["--remote", "ps", "--format", "json"])
             .output()
             .unwrap();
 
@@ -48,7 +48,14 @@ impl PodmanServiceTrait for PodmanService {
 
     fn running_containers_stats(&self) -> Vec<ContainerStats> {
         let output = Command::new("podman")
-            .args(["stats", "--format", "json", "--no-stream", "--no-reset"])
+            .args([
+                "--remote",
+                "stats",
+                "--format",
+                "json",
+                "--no-stream",
+                "--no-reset",
+            ])
             .output()
             .unwrap();
 

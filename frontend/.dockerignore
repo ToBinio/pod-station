@@ -1,0 +1,10 @@
+node_modules
+output
+dist
+.nuxt
+.cache
+
+# Environment files
+.env
+.env.local
+.env.*.local

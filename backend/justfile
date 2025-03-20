@@ -13,3 +13,10 @@ fmt:
 
 fix:
     cargo clippy --fix
+
+container-build:
+    podman build -t pod-station-backend .
+
+container-run:
+    systemctl --user enable --now podman.socket
+    podman run --rm -p 8080:8080 --name pod-station-backend -v $XDG_RUNTIME_DIR/podman/podman.sock:/run/podman/podman.sock -e DOCKER_HOST=unix:///run/podman/podman.sock --privileged pod-station-backend

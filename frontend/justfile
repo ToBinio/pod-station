@@ -5,3 +5,9 @@ dev *FLAGS:
 
 install:
     bun install
+
+container-build:
+    podman build -t pod-station-frontend .
+
+container-run:
+    podman run --rm -p 3000:3000 pod-station-frontend
