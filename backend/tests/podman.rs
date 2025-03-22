@@ -10,8 +10,8 @@ use serde_json::json;
 pub struct MockPodmanService;
 
 impl PodmanServiceTrait for MockPodmanService {
-    fn running_containers(&self) -> Vec<ContainerInfo> {
-        vec![
+    fn running_containers(&self) -> Result<Vec<ContainerInfo>, String> {
+        Ok(vec![
             ContainerInfo {
                 id: "123".to_string(),
                 names: vec!["test1".to_string()],
@@ -33,11 +33,11 @@ impl PodmanServiceTrait for MockPodmanService {
                 started_at: 123123,
                 state: "running".to_string(),
             },
-        ]
+        ])
     }
 
-    fn running_containers_stats(&self) -> Vec<ContainerStats> {
-        vec![
+    fn running_containers_stats(&self) -> Result<Vec<ContainerStats>, String> {
+        Ok(vec![
             ContainerStats {
                 id: "123".to_string(),
                 cpu_percent: "0.2%".to_string(),
@@ -56,7 +56,16 @@ impl PodmanServiceTrait for MockPodmanService {
                 mem_percent: "0.62%".to_string(),
                 mem_usage: "114.7kB / 33.44GB".to_string(),
             },
-        ]
+        ])
+    }
+
+    fn stop_container(&self, _id: &str) -> Result<(), String> {
+        self.running_containers()
+            .unwrap()
+            .iter()
+            .find(|c| c.id == _id)
+            .map(|_| ())
+            .ok_or("Container not found".to_string())
     }
 }
 
@@ -103,7 +112,7 @@ async fn get_containers() {
 }
 
 #[tokio::test]
-async fn ws() {
+async fn get_containers_ws() {
     let server = test_server();
 
     let mut connection = server.get_websocket("/ws").await.into_websocket().await;
@@ -142,4 +151,22 @@ async fn ws() {
     assert_message().await;
     assert_message().await;
     assert_message().await;
+}
+
+#[tokio::test]
+async fn stop_containers() {
+    let server = test_server();
+
+    let response = server.post("/containers/stop/123").await;
+
+    response.assert_status_ok();
+}
+
+#[tokio::test]
+async fn stop_containers_unknown() {
+    let server = test_server();
+
+    let response = server.post("/containers/stop/404").await;
+
+    response.assert_status_not_found();
 }

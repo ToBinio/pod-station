@@ -3,24 +3,26 @@ use std::{iter::zip, sync::Arc, time::Duration};
 use axum::{
     Json, Router,
     extract::{
-        State, WebSocketUpgrade,
+        Path, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
-    response::IntoResponse,
-    routing::{any, get},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::{any, get, post},
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use itertools::Itertools;
 use podman::PodmanServiceTrait;
 use serde::Serialize;
 use tower_http::trace::{self, TraceLayer};
-use tracing::{Level, warn};
+use tracing::{Level, error, warn};
 
 pub mod podman;
 
 pub fn app<PODMAN: PodmanServiceTrait + 'static>(podman_service: Arc<PODMAN>) -> Router {
     Router::new()
         .route("/containers", get(get_all_containers))
+        .route("/containers/stop/{id}", post(stop_container))
         .route("/ws", any(ws_handler))
         .with_state(podman_service)
         .layer(
@@ -40,10 +42,12 @@ pub struct Container {
     memory_usage: String,
 }
 
-pub fn get_container_stats<PODMAN: PodmanServiceTrait>(podman: Arc<PODMAN>) -> Vec<Container> {
-    let container_infos = podman.running_containers();
+pub fn get_container_stats<PODMAN: PodmanServiceTrait>(
+    podman: Arc<PODMAN>,
+) -> Result<Vec<Container>, String> {
+    let container_infos = podman.running_containers()?;
 
-    let container_stats = podman.running_containers_stats();
+    let container_stats = podman.running_containers_stats()?;
 
     let containers = zip(
         container_infos.iter().sorted_by(|a, b| a.id.cmp(&b.id)),
@@ -71,14 +75,21 @@ pub fn get_container_stats<PODMAN: PodmanServiceTrait>(podman: Arc<PODMAN>) -> V
     })
     .collect();
 
-    containers
+    Ok(containers)
 }
 
 async fn get_all_containers<PODMAN: PodmanServiceTrait>(
     State(podman): State<Arc<PODMAN>>,
-) -> Json<Vec<Container>> {
+) -> Response {
     let containers = get_container_stats(podman);
-    Json(containers)
+
+    match containers {
+        Ok(ok) => Json(ok).into_response(),
+        Err(err) => {
+            error!("Error getting container stats: {}", err);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 async fn ws_handler<PODMAN: PodmanServiceTrait + 'static>(
@@ -97,7 +108,14 @@ async fn handle_socket<PODMAN: PodmanServiceTrait + 'static>(
 
     let send_task = tokio::spawn(async move {
         loop {
-            let containers = get_container_stats(podman.clone());
+            let containers = match get_container_stats(podman.clone()) {
+                Ok(ok) => ok,
+                Err(err) => {
+                    error!("Error getting container stats: {}", err);
+                    vec![]
+                }
+            };
+
             let message = serde_json::to_string(&containers).unwrap();
 
             match sender.send(Message::Text(message.into())).await {
@@ -118,4 +136,19 @@ async fn handle_socket<PODMAN: PodmanServiceTrait + 'static>(
     }
 
     send_task.abort();
+}
+
+async fn stop_container<PODMAN: PodmanServiceTrait>(
+    Path(id): Path<String>,
+    State(podman): State<Arc<PODMAN>>,
+) -> StatusCode {
+    let result = podman.stop_container(&id);
+
+    match result {
+        Ok(_) => StatusCode::OK,
+        Err(err) => {
+            warn!("{}", err);
+            StatusCode::NOT_FOUND
+        }
+    }
 }

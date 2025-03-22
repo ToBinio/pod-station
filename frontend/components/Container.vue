@@ -37,9 +37,17 @@ watch(
 
         if (data.value.length > 60) {
             data.value.shift();
-        }
     },
 );
+
+async function onShutDown() {
+    const config = useRuntimeConfig();
+
+    await $fetch("/containers/stop/" + container.id, {
+        method: "POST",
+        baseURL: config.public.baseURL as string,
+    });
+}
 </script>
 
 <template>
@@ -47,6 +55,9 @@ watch(
         <div class="flex flex-row justify-around">
             <div>name: {{ container.name }}</div>
             <div data-allow-mismatch>uptime: {{ uptime }}</div>
+            <button @click="onShutDown()">
+                <icon name="wpf:shutdown" />
+            </button>
         </div>
         <div class="flex flex-row justify-around">
             <div>cpu: {{ container.cpu_percent }}%</div>

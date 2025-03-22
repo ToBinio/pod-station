@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use serde::Deserialize;
+use tracing::error;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -21,8 +22,9 @@ pub struct ContainerStats {
 }
 
 pub trait PodmanServiceTrait: Send + Sync {
-    fn running_containers(&self) -> Vec<ContainerInfo>;
-    fn running_containers_stats(&self) -> Vec<ContainerStats>;
+    fn running_containers(&self) -> Result<Vec<ContainerInfo>, String>;
+    fn running_containers_stats(&self) -> Result<Vec<ContainerStats>, String>;
+    fn stop_container(&self, id: &str) -> Result<(), String>;
 }
 
 #[derive(Default)]
@@ -35,18 +37,24 @@ impl PodmanService {
 }
 
 impl PodmanServiceTrait for PodmanService {
-    fn running_containers(&self) -> Vec<ContainerInfo> {
+    fn running_containers(&self) -> Result<Vec<ContainerInfo>, String> {
         let output = Command::new("podman")
             .args(["--remote", "ps", "--format", "json"])
             .output()
-            .unwrap();
+            .map_err(|err| {
+                error!("Failed to get running containers: {}", err);
+                err.to_string()
+            })?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
-        serde_json::from_str(&stdout).unwrap()
+        serde_json::from_str(&stdout).map_err(|err| {
+            error!("Failed to parse running containers: {}", err);
+            err.to_string()
+        })
     }
 
-    fn running_containers_stats(&self) -> Vec<ContainerStats> {
+    fn running_containers_stats(&self) -> Result<Vec<ContainerStats>, String> {
         let output = Command::new("podman")
             .args([
                 "--remote",
@@ -57,10 +65,28 @@ impl PodmanServiceTrait for PodmanService {
                 "--no-reset",
             ])
             .output()
-            .unwrap();
+            .map_err(|err| {
+                error!("Failed to get running containers stats: {}", err);
+                err.to_string()
+            })?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
-        serde_json::from_str(&stdout).unwrap()
+        let serde = serde_json::from_str(&stdout);
+
+        serde.map_err(|err| {
+            error!("Failed to parse running containers stats: {}", err);
+            err.to_string()
+        })
+    }
+
+    fn stop_container(&self, id: &str) -> Result<(), String> {
+        let output = Command::new("podman").args(["stop", id]).output().unwrap();
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!("Failed to stop container: {}", output.status))
+        }
     }
 }
