@@ -37,6 +37,7 @@ watch(
 
         if (data.value.length > 60) {
             data.value.shift();
+        }
     },
 );
 
