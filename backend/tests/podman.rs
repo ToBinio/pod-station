@@ -3,14 +3,14 @@ use std::sync::Arc;
 use axum_test::TestServer;
 use pod_station::{
     app,
-    podman::{ContainerInfo, ContainerStats, PodmanServiceTrait},
+    services::{ContainerInfo, ContainerServiceTrait},
 };
 use serde_json::json;
 
-pub struct MockPodmanService;
+pub struct MockContainerService;
 
-impl PodmanServiceTrait for MockPodmanService {
-    fn running_containers(&self) -> Result<Vec<ContainerInfo>, String> {
+impl ContainerServiceTrait for MockContainerService {
+    fn get_running_containers(&self) -> Result<Vec<ContainerInfo>, String> {
         Ok(vec![
             ContainerInfo {
                 id: "123".to_string(),
@@ -18,6 +18,9 @@ impl PodmanServiceTrait for MockPodmanService {
                 image: "test".to_string(),
                 started_at: 894,
                 state: "running".to_string(),
+                cpu_percent: "0.2%".to_string(),
+                mem_percent: "0.1%".to_string(),
+                mem_usage: "114.7kB / 33.44GB".to_string(),
             },
             ContainerInfo {
                 id: "456".to_string(),
@@ -25,6 +28,9 @@ impl PodmanServiceTrait for MockPodmanService {
                 image: "test2".to_string(),
                 started_at: 89583,
                 state: "running".to_string(),
+                cpu_percent: "0.5%".to_string(),
+                mem_percent: "0.8%".to_string(),
+                mem_usage: "114.7kB / 33.44GB".to_string(),
             },
             ContainerInfo {
                 id: "789".to_string(),
@@ -32,26 +38,6 @@ impl PodmanServiceTrait for MockPodmanService {
                 image: "test3".to_string(),
                 started_at: 123123,
                 state: "running".to_string(),
-            },
-        ])
-    }
-
-    fn running_containers_stats(&self) -> Result<Vec<ContainerStats>, String> {
-        Ok(vec![
-            ContainerStats {
-                id: "123".to_string(),
-                cpu_percent: "0.2%".to_string(),
-                mem_percent: "0.1%".to_string(),
-                mem_usage: "114.7kB / 33.44GB".to_string(),
-            },
-            ContainerStats {
-                id: "456".to_string(),
-                cpu_percent: "0.5%".to_string(),
-                mem_percent: "0.8%".to_string(),
-                mem_usage: "114.7kB / 33.44GB".to_string(),
-            },
-            ContainerStats {
-                id: "789".to_string(),
                 cpu_percent: "0.23%".to_string(),
                 mem_percent: "0.62%".to_string(),
                 mem_usage: "114.7kB / 33.44GB".to_string(),
@@ -59,18 +45,21 @@ impl PodmanServiceTrait for MockPodmanService {
         ])
     }
 
-    fn stop_container(&self, _id: &str) -> Result<(), String> {
-        self.running_containers()
-            .unwrap()
+    fn is_container_running(&self, id: &str) -> Result<bool, String> {
+        Ok(self.get_running_containers()?.iter().any(|c| c.id == id))
+    }
+
+    fn stop_container(&self, id: &str) -> Result<(), String> {
+        self.get_running_containers()?
             .iter()
-            .find(|c| c.id == _id)
+            .find(|c| c.id == id)
             .map(|_| ())
             .ok_or("Container not found".to_string())
     }
 }
 
 fn test_server() -> TestServer {
-    let podman_service = Arc::new(MockPodmanService);
+    let podman_service = Arc::new(MockContainerService);
     let app = app(podman_service.clone());
 
     TestServer::builder().http_transport().build(app).unwrap()

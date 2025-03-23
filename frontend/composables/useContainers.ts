@@ -9,7 +9,9 @@ export async function useContainers() {
     baseURL: config.public.baseURL as string,
   });
 
-  const { data: wsContainers } = useWebSocket<string>("ws://localhost:8080/ws");
+  const { data: wsContainers } = useWebSocket<string>(
+    "ws://localhost:8080/containers/ws",
+  );
 
   watch(
     fetchContainers,
