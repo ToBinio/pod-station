@@ -103,7 +103,7 @@ impl ContainerServiceTrait for PodmanService {
                 image: info.image.clone(),
                 id: info.id.clone(),
                 names: info.names.clone(),
-                started_at: info.started_at.clone(),
+                started_at: info.started_at,
                 state: info.state.clone(),
                 cpu_percent: stats.cpu_percent.clone(),
                 mem_percent: stats.mem_percent.clone(),
